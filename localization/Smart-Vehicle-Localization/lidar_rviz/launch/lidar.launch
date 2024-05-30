@@ -1,6 +1,0 @@
-<launch>
-  <include file="$(find after_treatment)/launch/process.launch">
-  </include>
-  
-  <node name="lidar_rviz" pkg="rviz" type="rviz" args="-d $(find lidar_rviz)/rviz/lidar.rviz"/>
-</launch>
