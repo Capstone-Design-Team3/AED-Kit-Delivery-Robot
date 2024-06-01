@@ -24,6 +24,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   geometry_msgs
   message_generation
+  message_runtime
 )
 
 ## System dependencies are found with CMake's conventions
@@ -63,6 +64,8 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   Gnss.msg
+  ObjectInfoArray.msg
+  ObjectInfo.msg
 )
 
 ## Generate services in the 'srv' folder
