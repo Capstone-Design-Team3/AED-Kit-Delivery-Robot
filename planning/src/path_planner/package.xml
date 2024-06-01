@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>path_planner</name>
+  <version>0.0.0</version>
+  <description>The path_planner package</description>
+
+  <maintainer email="simple9s@naver.com">TODO: Maintainer Name</maintainer>
+
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>roscpp</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+
+</package>
+
