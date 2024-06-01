@@ -18,7 +18,8 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   nav_msgs
   tf
-  jsk_recognition_msgs
+  # jsk_recognition_msgs
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -75,10 +76,10 @@ add_message_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   geometry_msgs#   sensor_msgs#   std_msgs#   visualization_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs   sensor_msgs   std_msgs   visualization_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -112,7 +113,7 @@ add_message_files(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES gps_imu_ekf
-  CATKIN_DEPENDS tf geometry_msgs lanelet2_core lanelet2_io lanelet2_projection roscpp sensor_msgs std_msgs visualization_msgs nav_msgs jsk_recognition_msgs
+  CATKIN_DEPENDS tf geometry_msgs lanelet2_core lanelet2_io lanelet2_projection roscpp sensor_msgs std_msgs visualization_msgs nav_msgs message_runtime
 #  DEPENDS system_lib
 )
 
