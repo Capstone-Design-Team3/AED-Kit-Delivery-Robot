@@ -1,0 +1,3 @@
+<launch>
+  <node name="kalman_filter" pkg="gps_imu_ekf" type="ekf_test" output="screen"/>
+</launch>

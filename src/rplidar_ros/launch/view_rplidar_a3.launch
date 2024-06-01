@@ -1,0 +1,14 @@
+<!--
+  Used for visualising rplidar in action.  
+  
+  It requires rplidar.launch.
+ -->
+<launch>
+  <include file="$(find rplidar_ros)/launch/rplidar_a3.launch" />
+
+  <node pkg="pass_through_filter" type="pass_through_filter" name="pass_through_filter" output="screen"/>
+  <node pkg="statistical_outlier_removal" type="statistical_outlier_removal" name="statistical_outlier_removal" output="screen"/>
+  <node pkg="euclidean_clustering" type="euclidean_clustering" name="euclidean_clustering" output="screen"/>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find rplidar_ros)/rviz/rplidar.rviz" />
+</launch>

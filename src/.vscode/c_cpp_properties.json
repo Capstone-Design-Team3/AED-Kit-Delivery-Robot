@@ -1,0 +1,31 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/ain833437/test1/devel/include/**",
+        "/home/ain833437/AED-Kit-Delivery-Robot/localization/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/ain833437/test1/src/image_pipeline-noetic/depth_image_proc/include/**",
+        "/home/ain833437/catkin_opencv/src/hw4/include/**",
+        "/home/ain833437/test1/src/image_pipeline-noetic/image_proc/include/**",
+        "/home/ain833437/test1/src/myahrs_driver-master/include/**",
+        "/home/ain833437/test1/src/image_pipeline-noetic/stereo_image_proc/include/**",
+        "/home/ain833437/test1/src/ublox_f9p/ublox_gps/include/**",
+        "/home/ain833437/test1/src/ublox_f9p/ublox_msgs/include/**",
+        "/home/ain833437/test1/src/ublox_f9p/ublox_serialization/include/**",
+        "/home/ain833437/test1/src/usb_cam-develop/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
