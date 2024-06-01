@@ -50,7 +50,7 @@ sensor_msgs::PointCloud2 StatisticalOutlierRemoval::statistical_outlier_removal(
     pcl::fromPCLPointCloud2(pcl_pc2, *cloud);
     
     // TODO: tunning
-    int num_neigbor_points = 10;  // 인접한 점들의 개수 설정
+    int num_neigbor_points = 15;  // 인접한 점들의 개수 설정
     double std_multiplier = 2.0;  // 이상점으로 처리할 표준편차의 배수 설정
     pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
     sor.setInputCloud(cloud);

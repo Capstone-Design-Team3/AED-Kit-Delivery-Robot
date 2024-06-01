@@ -20,6 +20,10 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <jsk_recognition_msgs/BoundingBox.h>
 #include <jsk_recognition_msgs/BoundingBoxArray.h>
+#include <sensor_msgs/NavSatFix.h>
+#include <lanelet2_projection/UTM.h>
+#include <sensor_msgs/Imu.h>
+#include <euclidean_clustering/Gnss.h>
 
 using namespace std;
 
@@ -32,12 +36,23 @@ class EuclideanClustering {
     sensor_msgs::PointCloud2 euclidean_clustering_pcl;
     std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> cluster_clouds;
 
+    // ros::Subscriber sub_gps;
+    lanelet::GPSPoint current_pos;
+    double vehicle_x, vehicle_y, vehicle_yaw;
+    sensor_msgs::NavSatFix gps_info;
+    ros::Subscriber sub_gnss;
+    euclidean_clustering::Gnss gnss_pose;
+
   public:
     EuclideanClustering();
     void sorCallback(const sensor_msgs::PointCloud2::ConstPtr& scan_pcl);
+    // void GPSCallback(const sensor_msgs::NavSatFix::ConstPtr& gps_msg);
+    // void GNSSCallback(const euclidean_clustering::Gnss::ConstPtr& gnss_msg);
     std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> euclidean_clustering();
-    void calc_info(const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& clusters);
-    void object_info();
+    void CalcInfo(const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& clusters);
+    void ObjectInfo(const std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr>& cluster_clouds);
+    std::pair<double, double> CoordinateTranform(double input_x, double input_y);
+    void Print();
     void Run();
     void Publish();
 };
@@ -45,11 +60,28 @@ class EuclideanClustering {
 EuclideanClustering::EuclideanClustering() {
     pub_pcl = nh.advertise<sensor_msgs::PointCloud2>("/euclidean_clustering_pcl2", 100);
     sub_scan_pcl = nh.subscribe("/statistical_outlier_removal_pcl2", 100, &EuclideanClustering::sorCallback, this);
+    // sub_gps = nh.subscribe("/ublox_gps/fix", 100, &EuclideanClustering::GPSCallback, this);
+    // sub_gnss = nh.subscribe("kalman_pose", 100, &EuclideanClustering::GNSSCallback, this);
 }
 
 void EuclideanClustering::sorCallback(const sensor_msgs::PointCloud2::ConstPtr& scan_pcl) {
     statistical_outlier_removal_pcl = *scan_pcl;
 }
+
+// void EuclideanClustering::GPSCallback(const sensor_msgs::NavSatFix::ConstPtr& gps_msg) {
+//     // gps_info = *gps_msg;
+//     lanelet::projection::UtmProjector projection(lanelet::Origin({37.5422589, 127.0793964}));
+    
+//     current_pos.lat = gps_msg -> latitude;
+//     current_pos.lon = gps_msg -> longitude;
+
+//     vehicle_x = projection.forward(current_pos).x();
+//     vehicle_y = projection.forward(current_pos).y();
+// }
+
+// void EuclideanClustering::GNSSCallback(const euclidean_clustering::Gnss::ConstPtr& gnss_msg) {
+//     gnss_pose = *gnss_msg;
+// }
 
 std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> EuclideanClustering::euclidean_clustering() {
     pcl::PCLPointCloud2 pcl_pc2;
@@ -62,9 +94,9 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> EuclideanClustering::euclidean
     tree->setInputCloud(cloud);  //KdTree 생성 
 
     // TODO: tunning
-    double cluster_tolerance = 0.1;  // [m]
-    int min_cluster_size = 5;
-    int max_cluster_size = 1000;
+    double cluster_tolerance = 0.3;  // [m]
+    int min_cluster_size = 15;
+    int max_cluster_size = 100000;
     std::vector<pcl::PointIndices> cluster_indices;       // 군집화된 결과물의 Index 저장, 다중 군집화 객체는 cluster_indices[0] 순으로 저장 
     // 군집화 오브젝트 생성  
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
@@ -112,20 +144,90 @@ std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> EuclideanClustering::euclidean
     return clusters;
 }
 
-void calc_info(const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& clusters) {
-    // clusters.
+void EuclideanClustering::CalcInfo(const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& clusters) {
+    int cluster_size = clusters->points.size();
+    // std::cout << "cluster_size: " << cluster_size << std::endl;
+    // std::cout << "===============================" << std::endl;
+    double x_avg = 0;
+    double y_avg = 0;
+    double min_x = clusters -> points[0].x;
+    double max_x = clusters -> points[0].x;
+    double min_y = clusters -> points[0].y;
+    double max_y = clusters -> points[0].y;
+
+    for(auto& pt : clusters ->points){
+        x_avg = x_avg + pt.x;
+        y_avg = y_avg + pt.y;
+
+        min_x = std::min(min_x,(double)pt.x);
+        max_x = std::max(max_x,(double)pt.x);
+        min_y = std::min(min_y,(double)pt.y);
+        max_y = std::max(max_y,(double)pt.y);
+    }
+
+    x_avg = x_avg / cluster_size;
+    y_avg = y_avg / cluster_size;
+    x_avg = -x_avg;
+
+    double size_x = abs(max_x - min_x);
+    double size_y = abs(max_y - min_y);
+    double size = std::max(size_x, size_y);
+    double large_size = sqrt(pow(size_x, 2) + pow(size_y, 2));
+
+    std::cout << "(x_avg, y_avg): " << x_avg << ", " << y_avg << " | size: " << size << std::endl;
+    std::cout << "large_size: " << large_size << std::endl;
+
+    std::pair<double, double> pair_latlong = CoordinateTranform(x_avg, y_avg);
+    double object_lat = pair_latlong.first;
+    double object_long = pair_latlong.second;
+    std::cout << "(object_lat, object_long): " << object_lat << ", " << object_long << std::endl;
+
+
 }
 
-void object_info() {
-    // for(std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr>::const_iterator itr = cluster_clouds.begin(); itr != cluster_clouds.end(); ++itr){
-    // calc_info(*itr);
-    // }
+void EuclideanClustering::ObjectInfo(const std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr>& cluster_clouds) {
+    for(std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr>::const_iterator itr = cluster_clouds.begin(); itr != cluster_clouds.end(); ++itr){
+    CalcInfo(*itr);
+    }
+}
+
+std::pair<double, double> EuclideanClustering::CoordinateTranform(double input_x, double input_y) {
+    vehicle_x = 0.0;
+    vehicle_y = 0.0;
+    vehicle_yaw = M_PI/2;
+
+    lanelet::projection::UtmProjector projection(lanelet::Origin({37.5422589, 127.0793964}));
+    // current_pos.lat = gnss_pose.latitude;
+    // current_pos.lon = gnss_pose.longitude;
+    // vehicle_x = projection.forward(current_pos).x();
+    // vehicle_y = projection.forward(current_pos).y();
+    // vehicle_yaw = gnss_pose.heading;
+
+    double x = input_x - vehicle_x;
+    double y = input_y - vehicle_y;
+    double a = atan2(y, x) - vehicle_yaw;
+    double d = sqrt( pow(x, 2) + pow(y, 2) );
+    double output_x = d * cos(a);
+    double output_y = d * sin(a);
+    std::cout << "(output_x, output_y): " << output_x << ", " << output_y << std::endl;
+
+    lanelet::BasicPoint3d utm_point(output_x, output_y, 0);
+    lanelet::GPSPoint gps_point = projection.reverse(utm_point);
+    double output_lat = gps_point.lat;
+    double output_long = gps_point.lon;
+
+    return std::make_pair(output_lat, output_long);
+}
+
+void EuclideanClustering::Print() {
+    std::cout << "===============================" << std::endl;
 }
 
 void EuclideanClustering::Run() {
     if(statistical_outlier_removal_pcl.data.size() > 0) {
         cluster_clouds = euclidean_clustering();
-        // object_info();
+        ObjectInfo(cluster_clouds);
+        Print();
         Publish();
     }
 }

@@ -38,26 +38,53 @@ void PassThroughFilter::scanCallback(const sensor_msgs::LaserScan::ConstPtr& sca
 }
 
 void PassThroughFilter::pass_through_filter() {
-    // camera 화각으로 설정
-    double angle = 180/85;
+    // // camera 화각으로 설정
+    double angle = 180/90;
     double min_angle = -M_PI/angle;
     double max_angle = M_PI/angle;
+    // double min_angle = -2.1;
+    // double max_angle = 2.1;
+
+    // // for (int i = 0; i < laser_scan_pcl.ranges.size(); ++i) {
+    // //     double angle = laser_scan_pcl.angle_min + i * laser_scan_pcl.angle_increment;
+    // //     if (!(angle < min_angle || angle > max_angle)) {
+    // //         laser_scan_pcl.ranges[i] = std::numeric_limits<double>::infinity();
+    // //     }
+    // // }
+
+    // // TODO: tunning
+    // // 인지하는 거리로 설정
+    // double min_distance = 0.0;
+    // double max_distance = 25.0;
+
+    // for (int i = 0; i < laser_scan_pcl.ranges.size(); ++i) {
+    //     double angle = laser_scan_pcl.angle_min + i * laser_scan_pcl.angle_increment;
+    //     double range = laser_scan_pcl.ranges[i];
+    //     if (!(angle < min_angle || angle > max_angle) || (range < min_distance || range > max_distance)) {
+    //         laser_scan_pcl.ranges[i] = std::numeric_limits<double>::infinity();
+    //     }
+    // }
+
+    double cx = 0.0; // Center x
+    double cy = 0.0; // Center y
+    double width = 50.0; // Width of the rectangle
+    double height = 5.0; // Height of the rectangle
+    
+    double x_min = cx - width / 2.0;
+    double x_max = cx + width / 2.0;
+    double y_min = cy - height / 2.0;
+    double y_max = cy + height / 2.0;
 
     for (int i = 0; i < laser_scan_pcl.ranges.size(); ++i) {
         double angle = laser_scan_pcl.angle_min + i * laser_scan_pcl.angle_increment;
-        if (!(angle < min_angle || angle > max_angle)) {
-            laser_scan_pcl.ranges[i] = std::numeric_limits<double>::infinity();
-        }
-    }
-
-    // TODO: tunning
-    // 인지하는 거리로 설정
-    double min_distance = 0.2;
-    double max_distance = 15.0;
-
-    for (int i = 0; i < laser_scan_pcl.ranges.size(); ++i) {
         double range = laser_scan_pcl.ranges[i];
-        if (range < min_distance || range > max_distance) {
+
+        // Convert polar coordinates to Cartesian coordinates
+        double x = range * cos(angle);
+        double y = range * sin(angle);
+
+        // Check if the point is inside the rectangular ROI
+        if (!(x >= x_min && x <= x_max && y >= y_min && y <= y_max) || !(angle < min_angle || angle > max_angle)) {
             laser_scan_pcl.ranges[i] = std::numeric_limits<double>::infinity();
         }
     }
