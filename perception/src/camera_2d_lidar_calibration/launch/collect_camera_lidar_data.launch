@@ -1,0 +1,13 @@
+<launch>
+
+    <node name="collect_camera_lidar_data" pkg="camera_2d_lidar_calibration" type="collect_camera_lidar_data.py" output="screen">
+        <param name="image_topic" value="/usb_cam/image_rect_color" />
+        <!-- <param name="image_topic" value="/usb_cam/image_raw" /> -->
+        <param name="config_file" value="$(find camera_2d_lidar_calibration)/config/config.yaml" />
+        <!-- <param name="config_file" value="/home/baek/perception/sensor_fusion_ws/src/camera_2d_lidar_calibration/config/config.yaml" /> -->
+        <param name="output_file" value="$(find camera_2d_lidar_calibration)/data/data.txt" />
+    </node>
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find camera_2d_lidar_calibration)/rviz/show.rviz" />
+
+</launch>
