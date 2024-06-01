@@ -1,0 +1,7 @@
+names:
+  0: car
+  1: pedestrian
+path: /home/jungcow/catkin_ws/src/yolov5_ros/src/datasets/bdd100k_compressed
+val: ./val/images
+train: ./train/images
+test: ./test/images
