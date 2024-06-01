@@ -266,7 +266,7 @@ public:
         next_node_msg.data[0] = next_node->x;
         next_node_msg.data[1] = next_node->y;
         pub_.publish(next_node_msg);
-        
+        cout << "next_node coord : "<<to_string(next_node->x) +" "+ to_string(next_node->y) <<endl;
     }
 
 private:
