@@ -25,7 +25,8 @@ const int N = 3, M = 2; //N =  state (x, y, yaw), M = Measure (x, y)
 MatrixXd Q(N,N), I(N,N), F_jacob(N,N), P_post(N,N), P_prior(N,N), K(N,M), R(M,M), H_jacob(M,N);
 VectorXd f(N), x_post(N), x_prior(N), z(M), h(M), f_dr(N),GPS_DATA(2); 
 
-lanelet::projection::UtmProjector projection(lanelet::Origin({37.541759, 127.078433}));
+ lanelet::projection::UtmProjector projection(lanelet::Origin({ 37.5418003, 127.07848369999999
+}));
 
 struct utm
 {

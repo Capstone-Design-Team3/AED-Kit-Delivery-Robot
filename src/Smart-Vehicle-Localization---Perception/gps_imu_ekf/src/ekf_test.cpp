@@ -89,7 +89,8 @@ void ExtendedKalmanFilter::DeadReckoning(){
 void ExtendedKalmanFilter::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
 {   
     
-    lanelet::projection::UtmProjector projection(lanelet::Origin({ 37.5422589, 127.0793964}));
+    lanelet::projection::UtmProjector projection(lanelet::Origin({ 37.5418003, 127.07848369999999
+}));
  
     measure_check = true;
     
@@ -169,14 +170,14 @@ void ExtendedKalmanFilter::EKF(){
    //
 
      
-    // if(vehicle_utm.velocity == 0){
-    //     Q << 0.01, 0.00, 0.00,      //값 높이면 측정값 비중 증가
-    //          0.00, 0.01, 0.00,
-    //          0.00, 0.00, 0.01;
+    if(vehicle_utm.velocity == 0){
+        Q << 0.01, 0.00, 0.00,      //값 높이면 측정값 비중 증가
+             0.00, 0.01, 0.00,
+             0.00, 0.00, 0.01;
 
-    //     R << 0.01, 0.0,               //값 높이면 센서값 비중 증가
-    //          0.0, 0.01;
-    // }
+        R << 0.01, 0.0,               //값 높이면 센서값 비중 증가
+             0.0, 0.01;
+    }
     // else{
     //     Q << 0.0001, 0.0, 0.0,          //값 높이면 측정값 비중 증가
     //          0.0, 0.0001, 0.0,
@@ -186,34 +187,16 @@ void ExtendedKalmanFilter::EKF(){
     //          0.0, 100;
     // }
 
-
-
-    if(PoCo<0.001){
-        Q << 0.1, 0.0, 0.0,          //값 높이면 측정값 비중 증가
-             0.0, 0.1, 0.0,
-             0.0, 0.0, 0.1;
-
-        R << 0.01, 0.0,               //값 높이면 IMU 센서값 비중 증가
-             0.0, 0.01;
-    }
     else{
-        Q << 0.0001, 0.0, 0.0,          //값 높이면 측정값 비중 증가
-             0.0, 0.0001, 0.0,
-             0.0, 0.0, 0.0001;
+        Q << 4.592449e-05, 0.0, 0.0,          //값 높이면 측정값 비중 증가
+             0.0, 4.592449e-05, 0.0,
+             0.0, 0.0, 5.895184e-06;
 
-        R << 1000, 0.0,               //값 높이면 IMU 센서값 비중 증가
-             0.0, 1000;
+        R << PoCo*10, 0.0,               //값 높이면 IMU 센서값 비중 증가
+             0.0, PoCo*10;
+    
     }
-    
-    //     else{
-    //     Q << 0, 0.0, 0.0,          //값 높이면 측정값 비중 증가
-    //          0.0, 0, 0.0,
-    //          0.0, 0.0, 0;
-
-    //     R << 1000, 0.0,               //값 높이면 IMU 센서값 비중 증가
-    //          0.0, 1000;
-    // }
-    
+ 
 
     if(state_init_check){
 
