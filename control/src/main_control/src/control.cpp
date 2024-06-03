@@ -11,7 +11,7 @@
 using namespace lanelet;
 double t_x,t_y;
 double gps_x,gps_y;
-double L = 0.8 ; //wheelbase
+double L = 4.377470994 ; //wheelbase
 double yaw;
 int zone;
 bool northp;
@@ -78,6 +78,7 @@ int main(int argc, char** argv) {
     std::cout << "UTM X: " << t_x<< ", UTM Y: " << t_y << std::endl;
     std::cout << "GPS X: " << gps_x << ", GPS Y: " << gps_y << std::endl;
     std::cout << "Target_Steering:" << target_steering << std::endl;
+    std::cout << "heading:" << heading<<"angle_to_target:"<< angle_to_target << std::endl;
     ros::spinOnce();
   }
   
