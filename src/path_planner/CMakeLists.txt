@@ -17,12 +17,15 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   message_runtime
   gps_imu_ekf
-
+  # euclidean_clustering
+  detection_msgs
+  sensor_msgs
+  nav_msgs
+  pcl_conversions
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -124,6 +127,7 @@ include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
   ${gps_imu_ekf_INCLUDE_DIRS}
+  # ${euclidean_clustering_INCLUDE_DIRS}
 
 )
 
@@ -217,3 +221,4 @@ target_link_libraries(path_planner_node
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+

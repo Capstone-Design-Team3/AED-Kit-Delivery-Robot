@@ -1,4 +1,3 @@
-<?xml version="1.0"?>
 <package format="2">
   <name>path_planner</name>
   <version>0.0.0</version>
@@ -19,9 +18,8 @@
   <build_depend>message_generation</build_depend>
   <build_depend>message_runtime</build_depend>
   <build_depend>gps_imu_ekf</build_depend>
-
-
-
+  <build_depend>euclidean_clustering</build_depend>
+  <build_depend>detection_msgs</build_depend>
 
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
@@ -29,6 +27,10 @@
   <build_export_depend>std_msgs</build_export_depend>
   <build_export_depend>visualization_msgs</build_export_depend>
   <build_export_depend>geometry_msgs</build_export_depend>
+  <build_export_depend>message_runtime</build_export_depend>
+  <build_export_depend>gps_imu_ekf</build_export_depend>
+  <build_export_depend>euclidean_clustering</build_export_depend>
+  <build_export_depend>detection_msgs</build_export_depend>
 
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
@@ -38,11 +40,10 @@
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>message_runtime</exec_depend>
   <exec_depend>gps_imu_ekf</exec_depend>
+  <exec_depend>euclidean_clustering</exec_depend>
+  <exec_depend>detection_msgs</exec_depend>
 
-
- <export>
+  <export>
     <!-- Other tools can request additional information be placed here -->
-
   </export>
 </package>
-

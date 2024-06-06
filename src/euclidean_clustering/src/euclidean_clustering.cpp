@@ -27,6 +27,8 @@
 #include <euclidean_clustering/ObjectInfoArray.h>
 #include <euclidean_clustering/ObjectInfo.h>
 #include "gps_imu_ekf/Gnss.h"
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 using namespace std;
 
@@ -47,6 +49,9 @@ class EuclideanClustering {
     gps_imu_ekf::Gnss gnss_pose;
     euclidean_clustering::ObjectInfoArray object_info_array;
     ros::Publisher pub_object_info_array;
+    ros::Publisher pub_object_markerarray;
+    visualization_msgs::MarkerArray object_markerarray;
+    int marker_count = 0;
 
   public:
     EuclideanClustering();
@@ -57,6 +62,7 @@ class EuclideanClustering {
     void CalcInfo(const pcl::PointCloud<pcl::PointXYZI>::ConstPtr& clusters);
     void ObjectInfo(const std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr>& cluster_clouds);
     std::pair<double, double> CoordinateTranform(double input_x, double input_y);
+    void ObjectVisualization(double object_lat, double object_long, double size);
     void Print();
     void Run();
     void Publish();
@@ -68,6 +74,7 @@ EuclideanClustering::EuclideanClustering() {
     // sub_gps = nh.subscribe("/ublox_gps/fix", 100, &EuclideanClustering::GPSCallback, this);
     sub_gnss = nh.subscribe("/kalman_pose", 100, &EuclideanClustering::GNSSCallback, this);
     pub_object_info_array = nh.advertise<euclidean_clustering::ObjectInfoArray>("/object_info_array", 100);
+    pub_object_markerarray = nh.advertise<visualization_msgs::MarkerArray>("/object_marker_array", 100);
 }
 
 void EuclideanClustering::sorCallback(const sensor_msgs::PointCloud2::ConstPtr& scan_pcl) {
@@ -204,6 +211,7 @@ void EuclideanClustering::CalcInfo(const pcl::PointCloud<pcl::PointXYZI>::ConstP
     // std::cout << "object_coordinate: " << object_coordinate[0] << ", " << object_coordinate[1] << ", " << object_coordinate[2] << std::endl;
     // object_array.data.push_back(object_coordinate[3]);
     // std::cout << "object_array: " << object_array << std::endl;
+    ObjectVisualization(object_lat, object_long, size);
 }
 
 void EuclideanClustering::ObjectInfo(const std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr>& cluster_clouds) {
@@ -220,7 +228,7 @@ std::pair<double, double> EuclideanClustering::CoordinateTranform(double input_x
     // vehicle_y = 0.0;
     // vehicle_yaw = M_PI/2;
 
-    lanelet::projection::UtmProjector projection(lanelet::Origin({37.5422589, 127.0793964}));
+    lanelet::projection::UtmProjector projection(lanelet::Origin({37.5418003, 127.07848369999999}));
     current_pos.lat = gnss_pose.latitude;
     current_pos.lon = gnss_pose.longitude;
     vehicle_x = projection.forward(current_pos).x();
@@ -243,6 +251,36 @@ std::pair<double, double> EuclideanClustering::CoordinateTranform(double input_x
     return std::make_pair(output_lat, output_long);
 }
 
+void EuclideanClustering::ObjectVisualization(double object_lat, double object_long, double size) {
+    lanelet::projection::UtmProjector projection(lanelet::Origin({37.5418003, 127.07848369999999}));
+    current_pos.lat= object_lat;
+    current_pos.lon = object_long;
+    double object_x = projection.forward(current_pos).x();
+    double object_y = projection.forward(current_pos).y();
+
+    visualization_msgs::Marker object_marker;
+    object_marker.header.frame_id = "map";
+    object_marker.id = marker_count;
+    object_marker.header.stamp = ros::Time::now();
+    object_marker.type = visualization_msgs::Marker::SPHERE;
+    object_marker.action = visualization_msgs::Marker::ADD;
+    object_marker.pose.position.x = object_x;
+    object_marker.pose.position.y = object_y;
+    object_marker.pose.position.z = 0;
+    object_marker.pose.orientation.x = 0.0;
+    object_marker.pose.orientation.y = 0.0;
+    object_marker.pose.orientation.z = 0.0;
+    object_marker.pose.orientation.w = 1.0;
+    object_marker.scale.x = 1.0;
+    object_marker.scale.y = 1.0;
+    object_marker.scale.z = 1.0;
+    object_marker.color.a = 1.0;
+    object_marker.color.r = 1.0;
+    // object_marker.color.g = 1.0;
+    object_markerarray.markers.push_back(object_marker);
+    marker_count++;
+}
+
 void EuclideanClustering::Print() {
     std::cout << "===============================" << std::endl;
 }
@@ -259,6 +297,7 @@ void EuclideanClustering::Run() {
 void EuclideanClustering::Publish() {
     pub_pcl.publish(euclidean_clustering_pcl);
     pub_object_info_array.publish(object_info_array);
+    pub_object_markerarray.publish(object_markerarray);
 }
 
 int main(int argc, char **argv) {

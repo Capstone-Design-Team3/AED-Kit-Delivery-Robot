@@ -1,7 +1,12 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Bool.h>
 #include <std_msgs/Float32MultiArray.h>
-#include <sensor_msgs/NavSatFix.h> // GPS 데이터를 위한 메시지
+#include <sensor_msgs/NavSatFix.h>
+#include <lanelet2_projection/UTM.h>
+#include <euclidean_clustering/ObjectInfoArray.h>
+#include <euclidean_clustering/ObjectInfo.h>
+#include <detection_msgs/BoundingBoxes.h>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -9,9 +14,13 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <gps_imu_ekf/Gnss.h>
 #include <unordered_set>
-#include "gps_imu_ekf/Gnss.h"
-
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl/point_cloud.h>
+#include <nav_msgs/OccupancyGrid.h>
 
 using namespace std;
 
@@ -50,7 +59,6 @@ struct CompareNode { // 우선순위 큐 용
 };
 
 float heuristic(Node* start, Node* end) { // 휴리스틱 계산
-    // 유클리드 거리 사용
     return sqrt(pow(start->x - end->x, 2) + pow(start->y - end->y, 2));
 }
 
@@ -58,7 +66,27 @@ double getDistance(Node* start, Node* end) { // 노드간 거리 계산
     return sqrt(pow(start->x - end->x, 2) + pow(start->y - end->y, 2));
 }
 
-Node* find_current_node(vector<Node*>& global_path, double x, double y){ //현재 차량의 좌표, localization 팀으로 부터 전달받은 lat, lon  좌표
+// 라디안으로 변환 함수
+double toRadians(double degree) {
+    return degree * M_PI / 180.0;
+}
+
+// 해버사인 공식을 사용하여 두 위도, 경도 간의 거리 계산 함수
+double haversine(double lat1, double lon1, double lat2, double lon2) {
+    double dLat = toRadians(lat2 - lat1);
+    double dLon = toRadians(lon2 - lon1);
+
+    lat1 = toRadians(lat1);
+    lat2 = toRadians(lat2);
+
+    double a = sin(dLat / 2) * sin(dLat / 2) +
+               sin(dLon / 2) * sin(dLon / 2) * cos(lat1) * cos(lat2);
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return R * c;
+}
+
+Node* find_current_node(vector<Node*>& global_path, double x, double y){
     double min = numeric_limits<double>::max();
     Node* result = nullptr;
     for(auto& node : global_path) {
@@ -70,7 +98,8 @@ Node* find_current_node(vector<Node*>& global_path, double x, double y){ //현�
     }
     return result;
 }
-Node* find_starting_node (vector<Node>& node_list, double x, double y){ //현재 차량의 좌표, localization 팀으로 부터 전달받은 lat, lon  좌표
+
+Node* find_starting_node (vector<Node>& node_list, double x, double y){
     double min = numeric_limits<double>::max();
     Node* result = nullptr;
     for(auto& node : node_list) {
@@ -83,7 +112,7 @@ Node* find_starting_node (vector<Node>& node_list, double x, double y){ //현재
     return result;
 }
 
-Node* find_next_node(vector<Node*>& global_path, Node* current_node, int offset){ //글로벌 패스와 커런트 노드, 얼마나 앞에 있는 노드를 반환할것 인지 offset 설정
+Node* find_next_node(vector<Node*>& global_path, Node* current_node, int offset){
     int length = global_path.size();
     int current_node_index = -1;
     Node* result = nullptr;
@@ -107,13 +136,10 @@ void draw_graph(vector<Node>& nodes) {
     for (auto& node : nodes) {
         std::string id_str = std::to_string(node.id);
         if (id_str.size() > 1) {
-            std::string truncated_id_str = id_str.substr(1); // 첫 번째 문자를 무시
+            std::string truncated_id_str = id_str.substr(1);
             int truncated_id = std::stoi(truncated_id_str);
             int target_id = truncated_id + 1;
-            //std::cout << "Node ID without first digit: " << truncated_id << std::endl;
-            //std::cout << "Nodes with ID " << target_id << " when ignoring the first digit:" << std::endl;
 
-            // 원하는 트렁크 ID를 가진 노드를 찾고 출력
             for (auto& other_node : nodes) {
                 std::string other_id_str = std::to_string(other_node.id);
                 if (other_id_str.size() > 1) {
@@ -129,55 +155,59 @@ void draw_graph(vector<Node>& nodes) {
     }
 }
 
-vector<Node*> Astar(Node* start, Node* end) { // A* 알고리즘
+vector<Node*> Astar(Node* start, Node* end, vector<Node>& nodes, double obs_lat = -1, double obs_lon = -1, double obs_size = 0) {
     if (start == nullptr || end == nullptr) {
         cerr << "Error: Start or end node is null" << endl;
         return vector<Node*>();
     }
-    int count = 0;
-    priority_queue<Node*, vector<Node*>, CompareNode> openSet; // 오픈리스트
-    unordered_set<Node*> set; // 오픈 리스트에 특정 객체 존재 여부 확인용
-    unordered_set<Node*> closedSet; // 닫힌리스트
+    priority_queue<Node*, vector<Node*>, CompareNode> openSet;
+    unordered_set<Node*> set;
+    unordered_set<Node*> closedSet;
 
-    start->g = 0; // 시작점이니까 0
-    start->h = heuristic(start, end); // h 계산
-    start->f = start->g + start->h; // f = g + h
-    openSet.push(start); // 오픈리스트(우선순위 큐)에 추가
-    set.insert(start); // 나중에 오픈리스트에 값이 존재하는지 알아야 해서
-    while (!openSet.empty()) { // 오픈리스트가 빌 때까지 반복
-        Node* current = openSet.top(); // f 값이 가장 작은 노드
-        openSet.pop(); // f 값이 가장 작은 노드를 제거
-        set.erase(current); // 여기서도 제거
+    start->g = 0;
+    start->h = heuristic(start, end);
+    start->f = start->g + start->h;
+    openSet.push(start);
+    set.insert(start);
+    while (!openSet.empty()) {
+        Node* current = openSet.top();
+        openSet.pop();
+        set.erase(current);
 
-        closedSet.insert(current); // 닫힌 리스트에 현재 노드 추가
+        closedSet.insert(current);
 
-        if (*current == *end) { // 목적지에 도달했으면 경로를 반환
-        
-            vector<Node*> path; // 결과 경로 리스트
+        if (*current == *end) {
+            vector<Node*> path;
             Node* current_2 = current;
-            while (current_2 != start) { // 시작점까지 부모를 따라가면서 경로를 저장
+            while (current_2 != start) {
                 path.push_back(current_2);
                 current_2 = current_2->parent;
             }
-            path.push_back(start); // 시작점도 추가
-            reverse(path.begin(), path.end()); // 시작부터 끝까지 순서를 바꿈
-            return path; // 최단 경로 반환
+            path.push_back(start);
+            reverse(path.begin(), path.end());
+            return path;
         }
         
-        for (Node* neighbor : current->neighbors) { // 현재 노드의 이웃에 대해 반복
-            if (closedSet.find(neighbor) != closedSet.end()) { // 이웃이 닫힌 리스트에 있으면 건너뜀
+        for (Node* neighbor : current->neighbors) {
+            if (closedSet.find(neighbor) != closedSet.end()) {
                 continue;
             }
 
-            double tentative_g_score = current->g + getDistance(current, neighbor); // 새로운 g 값 계산
-            if (set.find(neighbor) == set.end()) { // 이웃이 오픈 리스트에 포함되어 있지 않으면 추가
+            if (obs_lat != -1 && obs_lon != -1 && obs_size != 0) {
+                double obs_dist = haversine(neighbor->x, neighbor->y, obs_lat, obs_lon);
+                if (obs_dist < obs_size) {
+                    continue;
+                }
+            }
+
+            double tentative_g_score = current->g + getDistance(current, neighbor);
+            if (set.find(neighbor) == set.end()) {
                 openSet.push(neighbor);
                 set.insert(neighbor);
-            } else if (tentative_g_score >= neighbor->g) { // 이미 이웃이 오픈 리스트에 있고, 더 나쁜 경로인 경우 스킵
+            } else if (tentative_g_score >= neighbor->g) {
                 continue;
             }
 
-            // 새로운 경로로 이웃의 정보 업데이트
             neighbor->parent = current;
             neighbor->g = tentative_g_score;
             neighbor->h = heuristic(neighbor, end);
@@ -185,7 +215,7 @@ vector<Node*> Astar(Node* start, Node* end) { // A* 알고리즘
         }
     }
 
-    return vector<Node*>(); // 경로를 찾지 못한 경우 빈 리스트 반환
+    return vector<Node*>();
 }
 
 vector<Node> init_nodes(const string& filename) {
@@ -202,7 +232,6 @@ vector<Node> init_nodes(const string& filename) {
         stringstream ss(line);
         string node_declaration;
 
-        // CSV 파일의 각 라인은 'Node nodeID(id, x, y);' 형식이어야 합니다.
         if (getline(ss, node_declaration)) {
             string node_prefix = "Node ";
             if (node_declaration.find(node_prefix) == 0) {
@@ -228,67 +257,189 @@ vector<Node> init_nodes(const string& filename) {
     return node_list;
 }
 
-// ROS 노드 클래스
 class PathPlanner {
 public:
     PathPlanner() {
-        // 노드 초기화
         ros::NodeHandle nh;
         Astar_done = false;
-        // Subscriber와 Publisher 설정
-        // 노드 초기화
-        // string filename = "/home/hyeongju/graduate/catkin_ws/src/path_planner/src/node.csv";
-        string filename = "/home/ain833437/AED-Kit-Delivery-Robot/planning/src/path_planner/src/node.csv";
+        person_detected = false;
+        car_detected = false;
+        current_lat = 0.0;
+        current_lon = 0.0;
+        // string filename = "/home/test1/src/path_planner/src/node.csv";
+         string filename = "/home/ain833437/test1/src/path_planner/src/node.csv";
+       // string filename = "node.csv";
         nodes_ = init_nodes(filename);
     
         draw_graph(nodes_);
        
-        sub_ = nh.subscribe("/kalman_pose", 1000, &PathPlanner::poseCallback, this);
+        sub_pose_ = nh.subscribe("kalman_pose", 1000, &PathPlanner::poseCallback, this);
+        sub_obj_info_ = nh.subscribe("/object_info_array", 1000, &PathPlanner::objectInfoCallback, this);
+        sub_bboxes_ = nh.subscribe("/yolov5/detections", 1000, &PathPlanner::boundingBoxCallback, this);
         pub_ = nh.advertise<std_msgs::Float32MultiArray>("next_node", 1000);
+        pub_stop = nh.advertise<std_msgs::Bool>("stop_decision", 1000);
+        map_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/map_view_out", 1);
     }
-   
-    void poseCallback(const gps_imu_ekf::Gnss::Ptr& msg) {
-        double current_lat = msg->latitude;
-        double current_lon = msg->longitude;
 
-        if(Astar_done == false){
-            Node* current_node = find_starting_node(nodes_,current_lat, current_lon);
-            Node target_node = nodes_[nodes_.size()-1];
-            global_path_ = Astar(current_node, &target_node); // 예시
+    void poseCallback(const gps_imu_ekf::Gnss::ConstPtr& msg) {
+        current_lat = msg->latitude;
+        current_lon = msg->longitude;
+
+        if (person_detected) {
+            ROS_INFO("Person detected, stopping the vehicle.");
+            // return;
+        }
+
+        if (Astar_done == false) {
+            Node* current_node = find_starting_node(nodes_, current_lat, current_lon);
+            Node target_node = nodes_[nodes_.size() - 1];
+            global_path_ = Astar(current_node, &target_node, nodes_);
             
             cout << "Astar done" << endl;
             Astar_done = true;
         }
-        Node* current_node = find_current_node(global_path_, current_lat, current_lon);
-        Node* next_node = find_next_node(global_path_, current_node, 3); // 예시
 
-        
+        Node* current_node = find_current_node(global_path_, current_lat, current_lon);
+        Node* next_node = find_next_node(global_path_, current_node, 5);
+
         std_msgs::Float32MultiArray next_node_msg;
         next_node_msg.data.resize(2);
         next_node_msg.data[0] = next_node->x;
         next_node_msg.data[1] = next_node->y;
         pub_.publish(next_node_msg);
-        std::cout << std::fixed << std::setprecision(7);
+        cout << "next_noe id:" << to_string(next_node->id)<<endl;
+        cout << "next_node coord : " << to_string(next_node->x) << " " << to_string(next_node->y) << endl;
+        
+        //여기부터 플로팅
+        lanelet::projection::UtmProjector projection(lanelet::Origin({37.5418003, 127.07848369999999}));
+        pcl::PointCloud<pcl::PointXYZRGB> all_nodes;
+        bool append = false;
+        for(auto& node : nodes_){//모든 노드, 흰색 점
+            pcl::PointXYZRGB point = pcl::PointXYZRGB(255,255,255); 
+            current_pos.lat= node.x;
+            current_pos.lon = node.y;
+            point.x= projection.forward(current_pos).x();
+            point.y= projection.forward(current_pos).y();
+            point.z = 0;
+            all_nodes.push_back(point);
+        }
+        for(auto& node : global_path_){//글로벌 경로 노드, 초록색
+            if(node == current_node){append = true;}
+            if(append == true){
+            pcl::PointXYZRGB point = pcl::PointXYZRGB(0,255,0);
+            current_pos.lat= node->x;
+            current_pos.lon = node->y;
+            point.x= projection.forward(current_pos).x();
+            point.y= projection.forward(current_pos).y();
+            point.z = 0;
+            all_nodes.push_back(point);
+            }
+        }
+        pcl::PointXYZRGB point = pcl::PointXYZRGB(255,0,0);//현재 차량의 위치, 빨간색
+        current_pos.lat= current_node->x;
+        current_pos.lon = current_node->y;
+        point.x= projection.forward(current_pos).x();
+        point.y= projection.forward(current_pos).y();
+        point.z = 0;
+        all_nodes.push_back(point);
 
-        cout << "next_node coord : "<<to_string(next_node->x) +" "+ to_string(next_node->y) <<endl;
+        point = pcl::PointXYZRGB(0,0,255);//next_node 위치, 파란색
+        current_pos.lat= next_node->x;
+        current_pos.lon = next_node->y;
+        point.x= projection.forward(current_pos).x();
+        point.y= projection.forward(current_pos).y();
+        point.z = 0;
+        all_nodes.push_back(point);
+
+        sensor_msgs::PointCloud2 map_view;
+        pcl::toROSMsg(all_nodes, map_view);
+        map_view.header = msg->header;
+        map_view.header.frame_id ="map";
+        map_pub_.publish(map_view);
+    }
+
+    void objectInfoCallback(const euclidean_clustering::ObjectInfoArray::ConstPtr& msg) {
+        if (person_detected) {
+            ROS_INFO("Person detected, stopping the vehicle.");
+            return;
+        }
+
+        for (const auto& obj : msg->objectinfo) {
+            double obs_lat = obj.latitude;
+            double obs_lon = obj.longitude;
+            double obs_size = obj.size;
+
+            if (car_detected) {
+                Node* current_node = find_starting_node(nodes_, obs_lat, obs_lon);
+                Node target_node = nodes_[nodes_.size() - 1];
+                global_path_ = Astar(current_node, &target_node, nodes_, obs_lat, obs_lon, obs_size);
+                cout << "Replanning path to avoid obstacle" << endl;
+            }
+        }
+    }
+
+    void boundingBoxCallback(const detection_msgs::BoundingBoxes::ConstPtr& msg) {
+        
+        person_detected_temp = false;
+        car_detected_temp = false;
+
+        for (const auto& bbox : msg->bounding_boxes) {
+            if (bbox.Class == "pedestrian") {
+                //double person_lat = bbox.ymin;
+                //double person_lon = bbox.xmin;
+                //double distance_to_person = haversine(current_lat, current_lon, person_lat, person_lon);
+
+               // if (distance_to_person <= 5.0) {
+                  person_detected_temp = false;
+             //   }
+            } else if (bbox.Class == "car") {
+                car_detected_temp = false;
+            }
+        }
+
+        person_detected = person_detected_temp;
+        car_detected = car_detected_temp;
+        std_msgs::Bool stop_sign;
+        stop_sign.data = person_detected;
+        pub_stop.publish(stop_sign);
+    }
+    void reset(){
+        person_detected = false;
+        car_detected = false;
+        std_msgs::Bool stop_sign;
+        stop_sign.data = person_detected;
+        pub_stop.publish(stop_sign);
     }
 
 private:
-    ros::Subscriber sub_;
+    ros::Subscriber sub_pose_;
+    ros::Subscriber sub_obj_info_;
+    ros::Subscriber sub_bboxes_;
     ros::Publisher pub_;
+    ros::Publisher pub_stop;
     vector<Node> nodes_;
     vector<Node*> global_path_;
+    ros::Publisher map_pub_;
     bool Astar_done;
-};
+    bool person_detected;
+    bool car_detected;
+    double current_lat;
+    double current_lon;
+    bool person_detected_temp;
+    bool car_detected_temp;
+    lanelet::GPSPoint current_pos;
+};  
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "path_planner_node");
     
     PathPlanner path_planner;
 
-    ros::Rate loop_rate(2); // 0.5초마다 실행
+    ros::Rate loop_rate(4); // 0.25초마다 실행
 
     while (ros::ok()) {
+        path_planner.reset();
         ros::spinOnce();
         loop_rate.sleep();
     }

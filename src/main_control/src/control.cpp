@@ -2,6 +2,7 @@
 #include <ros/ros.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Float32MultiArray.h>
+#include <std_msgs/Bool.h>
 #include "main_control/Gnss.h"
 #include <vector>
 #include <cmath>
@@ -16,6 +17,7 @@ double yaw;
 int zone;
 bool northp;
 double target_steering;
+double target_speed = 3.5;
 lanelet::projection::UtmProjector projector(lanelet::Origin({ 37.5418003, 127.07848369999999}));
 lanelet::GPSPoint pathPoint;
 lanelet::GPSPoint gpsPoint;
@@ -33,6 +35,17 @@ void point_CallBack(const std_msgs::Float32MultiArray::ConstPtr& msg){
   t_y = pathPoint_utm.y();
   std::cout<<"tx:" << t_x << "ty:" << t_y <<std::endl;
 }
+void stop_CallBack(const std_msgs::Bool::ConstPtr& msg){
+ bool stop = msg->data;
+ if(stop == true){
+  target_speed = 0;
+ }
+ else{
+  target_speed = 2.5;
+ }
+}
+
+
 
 void gps_CallBack(const main_control::Gnss::ConstPtr& msg){
   {
@@ -49,7 +62,7 @@ void gps_CallBack(const main_control::Gnss::ConstPtr& msg){
     double distance_to_target = sqrt(dx * dx + dy * dy);
 
     double angle_to_target = atan2(dy, dx) ; // -PI ~ PI 
-    double alpha = heading - angle_to_target ; //Heading 기준과 angle_to_target 기준을 맞춰야함 
+    double alpha = heading - angle_to_target  ; //Heading 기준과 angle_to_target 기준을 맞춰야함 
     std::cout << "heading:" << heading <<"angle_to_target"<< angle_to_target<<std::endl;
     target_steering = (atan2(2 * L * sin(alpha), distance_to_target))*180/M_PI;
 }
@@ -64,23 +77,26 @@ int main(int argc, char** argv) {
 
   ros::Subscriber target_point_sub = nh.subscribe("/next_node", 10, point_CallBack);
   ros::Subscriber gps_sub = nh.subscribe("/kalman_pose",10, gps_CallBack);
+  ros::Subscriber stop_sub = nh.subscribe("/stop_decision",10, stop_CallBack);
   std_msgs::Float32 angle_msg;
   std_msgs::Float32 speed_msg;
   
 
 
+  ros::Rate loop_rate(50);
   
   while(ros::ok()){
+     ros::spinOnce();
     angle_msg.data = target_steering;
-    //speed_msg.data = 0;
+    speed_msg.data = target_speed;
     target_angle_pub.publish(angle_msg);
-    //target_speed_pub.publish(speed_msg);
+    target_speed_pub.publish(speed_msg);
     std::cout << "UTM X: " << t_x<< ", UTM Y: " << t_y << std::endl;
     std::cout << "GPS X: " << gps_x << ", GPS Y: " << gps_y << std::endl;
     std::cout << "Target_Steering:" << target_steering << std::endl;
     
 
-    ros::spinOnce();
+   loop_rate.sleep();
   }
   
 
