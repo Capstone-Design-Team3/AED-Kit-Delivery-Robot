@@ -239,18 +239,18 @@ std::pair<double, double> EuclideanClustering::CoordinateTranform(double input_x
     vehicle_x = projection.forward(current_pos).x();
     vehicle_y = projection.forward(current_pos).y();
     vehicle_yaw = gnss_pose.heading;
-
-    double x = input_x + vehicle_x;
-    double y = input_y + vehicle_y;
-    double a = atan2(y, x) - vehicle_yaw;
+    
+    double x = input_x;
+    double y = input_y;
+    double a = atan2(x,y ) + vehicle_yaw;
     double d = sqrt( pow(x, 2) + pow(y, 2) );
-    // double output_x = d * cos(a);
-    // double output_y = d * sin(a);
-    double output_x = d * sin(a-M_PI/2);
-    double output_y = d * cos(a-M_PI/2);
-    output_x = -output_x;
-    output_y = -output_y;
-    std::cout << "(output_x, output_y): " << output_x << ", " << output_y << std::endl;
+    double output_x = d * sin(a);
+    double output_y = d * cos(a);
+    // double output_x = d * sin(a-M_PI/2);
+    // double output_y = d * cos(a-M_PI/2);
+    output_x = output_x+vehicle_x;
+    output_y = -output_y+vehicle_y;
+    // std::cout << "(output_x, output_y): " << output_x << ", " << output_y << std::endl;
 
     lanelet::BasicPoint3d utm_point(output_x, output_y, 0);
     lanelet::GPSPoint gps_point = projection.reverse(utm_point);

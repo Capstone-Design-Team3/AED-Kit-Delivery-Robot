@@ -26,7 +26,7 @@ using namespace std;
 
 struct Node;
 vector<Node> init_nodes(const string& filename);
-constexpr double R = 6371.0; // 지구 반지름 (km)
+constexpr double R = 6364676; // 지구 반지름 (km)
 
 struct Node {
     int id;
@@ -215,7 +215,7 @@ public:
         draw_graph(nodes_);
        
         sub_pose_ = nh.subscribe("kalman_pose", 1000, &PathPlanner::poseCallback, this);
-        sub_obj_info_ = nh.subscribe("/object_info_array", 1000, &PathPlanner::objectInfoCallback, this);
+        sub_obj_info_ = nh.subscribe("/object_info_array", 1, &PathPlanner::objectInfoCallback, this);
         //sub_bboxes_ = nh.subscribe("/yolov5/detections", 1000, &PathPlanner::boundingBoxCallback, this); 장애물 타입 필요없음!!!!!
         pub_ = nh.advertise<std_msgs::Float32MultiArray>("next_node", 1000);
         pub_stop = nh.advertise<std_msgs::Bool>("stop_decision", 1000);

@@ -64,7 +64,7 @@ void gps_CallBack(const main_control::Gnss::ConstPtr& msg){
     double angle_to_target = atan2(dy, dx) ; // -PI ~ PI 
     double alpha = heading - angle_to_target  ; //Heading 기준과 angle_to_target 기준을 맞춰야함 
     std::cout << "heading:" << heading <<"angle_to_target"<< angle_to_target<<std::endl;
-    target_steering = 0.8*(atan2(2 * L * sin(alpha), distance_to_target))*180/M_PI;
+    target_steering = 0.7*(atan2(2 * L * sin(alpha), distance_to_target))*180/M_PI;
 }
 }
 
