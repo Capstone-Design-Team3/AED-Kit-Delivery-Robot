@@ -41,11 +41,12 @@ void ExtendedKalmanFilter::init(){
 }
 
 void ExtendedKalmanFilter::state_init(){
-    if(vehicle_utm.velocity>0.05&&gps_input && !state_init_check){  //vehicle_utm.velocity>0 &&없어서 빙글 빙글 돌았던거
+    if(vehicle_utm.velocity>0.4&&gps_input && !state_init_check){  //vehicle_utm.velocity>0 &&없어서 빙글 빙글 돌았던거
         
         state_init_check = true;
         measure_check = false;
         prev_yaw = atan2((gps_utm.y-gps_utm.prev_y),(gps_utm.x-gps_utm.prev_x)); //이거때문에 초반 yaw
+        // prev_yaw = 1.55; //이거때문에 초반 yaw
         std::cout <<"gps_utm.prev_x: "<<gps_utm.prev_x<<"\n"<<std::endl;
         std::cout <<"gps_utm.prev_y : "<<gps_utm.prev_y<<"\n"<<std::endl;
         std::cout <<"gps_utm.x: "<<gps_utm.x<<"\n"<<std::endl;
@@ -191,8 +192,8 @@ void ExtendedKalmanFilter::EKF(){
              0.0, 4.592449e-05, 0.0,
              0.0, 0.0, 5.895184e-06;
 
-        R << PoCo*100, 0.0,               //값 높이면 IMU 센서값 비중 증가
-             0.0, PoCo*100;
+        R << PoCo*10, 0.0,               //값 높이면 IMU 센서값 비중 증가
+             0.0, PoCo*10;
     
     }
  
@@ -346,9 +347,9 @@ void ExtendedKalmanFilter::visualizeHeading(geometry_msgs::PoseStamped ekf_pose,
 
     car_model.header.frame_id = "map";
     car_model.header.stamp = ros::Time::now();
-    car_model.dimensions.x = 3.0;
-    car_model.dimensions.y = 1.5;
-    car_model.dimensions.z = 1.0;
+    car_model.dimensions.x = 1.0;
+    car_model.dimensions.y = 0.5;
+    car_model.dimensions.z = 0.3;
     car_model.pose.position.x = vehicle_utm.x;
     car_model.pose.position.y = vehicle_utm.y;
     car_model.pose.orientation = tf::createQuaternionMsgFromYaw(vehicle_utm.yaw);

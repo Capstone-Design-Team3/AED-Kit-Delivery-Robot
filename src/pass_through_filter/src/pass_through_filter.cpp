@@ -67,8 +67,8 @@ void PassThroughFilter::pass_through_filter() {
 
     double cx = 0.0; // Center x
     double cy = 0.0; // Center y
-    double width = 50.0; // Width of the rectangle
-    double height = 5.0; // Height of the rectangle
+    double width = 10.0; // Width of the rectangle
+    double height = 2.0; // Height of the rectangle
     
     double x_min = cx - width / 2.0;
     double x_max = cx + width / 2.0;

@@ -17,7 +17,7 @@ double yaw;
 int zone;
 bool northp;
 double target_steering;
-double target_speed = 3.5;
+double target_speed = 5;
 lanelet::projection::UtmProjector projector(lanelet::Origin({ 37.5418003, 127.07848369999999}));
 lanelet::GPSPoint pathPoint;
 lanelet::GPSPoint gpsPoint;
@@ -41,7 +41,7 @@ void stop_CallBack(const std_msgs::Bool::ConstPtr& msg){
   target_speed = 0;
  }
  else{
-  target_speed = 2.5;
+  target_speed = 5;
  }
 }
 
@@ -64,7 +64,7 @@ void gps_CallBack(const main_control::Gnss::ConstPtr& msg){
     double angle_to_target = atan2(dy, dx) ; // -PI ~ PI 
     double alpha = heading - angle_to_target  ; //Heading 기준과 angle_to_target 기준을 맞춰야함 
     std::cout << "heading:" << heading <<"angle_to_target"<< angle_to_target<<std::endl;
-    target_steering = (atan2(2 * L * sin(alpha), distance_to_target))*180/M_PI;
+    target_steering = 0.8*(atan2(2 * L * sin(alpha), distance_to_target))*180/M_PI;
 }
 }
 

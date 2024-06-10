@@ -11,7 +11,7 @@
 using namespace lanelet;
 double t_x,t_y;
 double gps_x,gps_y;
-double L = 0.8 ; //wheelbase
+double L = 0.4337 ; //wheelbase
 double yaw;
 int zone;
 bool northp;
