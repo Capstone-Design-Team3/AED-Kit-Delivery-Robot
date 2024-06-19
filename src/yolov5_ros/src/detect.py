@@ -124,13 +124,17 @@ class Yolov5Detector:
         #! measure inference time
         start = time.time()
         pred = self.model(im, augment=False, visualize=False)
-        end = time.time()
-        inference_time = round((1000 / (end - start)), 2)
+
 
 
         pred = non_max_suppression(
             pred, self.conf_thres, self.iou_thres, self.classes, self.agnostic_nms, max_det=self.max_det
         )
+
+        end = time.time()
+        inference_time_ms = (end - start)
+        inference_fps = 1 / inference_time_ms
+        inference_fps = inference_fps
 
         ### To-do move pred to CPU and fill BoundingBox messages
         
@@ -179,7 +183,7 @@ class Yolov5Detector:
         if self.view_image:
             font = cv2.FONT_HERSHEY_SIMPLEX 
             blue = (255, 0, 0) 
-            im0 = cv2.putText(im0, str(inference_time), (0, 40), font, 2, blue, 1, cv2.LINE_AA)
+            im0 = cv2.putText(im0, f'FPS: {str(inference_fps)}', (0, 40), font, 2, blue, 1, cv2.LINE_AA)
             cv2.imshow(str(0), im0)
             cv2.waitKey(1)  # 1 millisecond
         if self.publish_image:

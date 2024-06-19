@@ -38,7 +38,7 @@ std::vector<capture_format_t> AbstractV4LUSBCam::supported_formats = std::vector
 
 /* V4L camera parameters */
 bool AbstractV4LUSBCam::streaming_status = false;
-std::string AbstractV4LUSBCam::video_device_name = "/dev/video0";
+std::string AbstractV4LUSBCam::video_device_name = "/dev/video2";
 std::string AbstractV4LUSBCam::io_method_name = "mmap";
 std::string AbstractV4LUSBCam::pixel_format_name = "uyvy";
 unsigned int AbstractV4LUSBCam::v4l_pixel_format = V4L2_PIX_FMT_UYVY;

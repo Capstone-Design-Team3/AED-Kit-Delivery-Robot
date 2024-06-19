@@ -161,8 +161,6 @@ void draw_graph(vector<Node>& nodes) {
 }
 
 
-
-
 vector<Node> init_nodes(const string& filename) {
     vector<Node> node_list;
     ifstream file(filename);
@@ -197,6 +195,7 @@ vector<Node> init_nodes(const string& filename) {
             }
         }
     }
+    
 
     file.close();
     return node_list;
@@ -211,8 +210,8 @@ public:
         car_detected = false;
         current_lat = 0.0;
         current_lon = 0.0;
-        // string filename = "/home/jae/test1/src/path_planner/src/node.csv";
-        string filename = "/home/ain833437/test1/src/path_planner/src/node.csv";
+        //string filename = "/home/jae/test1/src/path_planner/src/node.csv";
+        string filename = "/home/ain833437/test1/src/path_planner_v2/src/node.csv";
        //string filename = "node.csv";
         nodes_ = init_nodes(filename);
     
@@ -220,10 +219,11 @@ public:
        
         sub_pose_ = nh.subscribe("kalman_pose", 1000, &PathPlanner::poseCallback, this);
         sub_obj_info_ = nh.subscribe("/object_info_array", 1, &PathPlanner::objectInfoCallback, this);
+        pub_next_by_node_ = nh.advertise<std_msgs::Float32MultiArray>("current2_node", 1000);
         //sub_bboxes_ = nh.subscribe("/yolov5/detections", 1000, &PathPlanner::boundingBoxCallback, this); 장애물 타입 필요없음!!!!!
+        pub_current_node_ = nh.advertise<std_msgs::Float32MultiArray>("current_node", 1000);
         pub_ = nh.advertise<std_msgs::Float32MultiArray>("next_node", 1000);
         pub_stop = nh.advertise<std_msgs::Bool>("stop_decision", 1000);
-        pub_current_node_ = nh.advertise<std_msgs::Float32MultiArray>("current_node", 1000);
         map_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/map_view_out", 1);
     }
     
@@ -237,7 +237,7 @@ public:
             Node target_node = nodes_[nodes_.size() - 1];
             //경로 생성시 시간을 측정 시작 및 종료를 위한 부분
             auto start_time = high_resolution_clock::now();
-            global_path_ = Astar(current_node, &target_node);
+            global_path_ = const_path();//그냥 고정 경로
             auto end_time = high_resolution_clock::now();
             auto duration = duration_cast<milliseconds>(end_time - start_time).count();
             
@@ -252,14 +252,17 @@ public:
             Astar_done = true;
         }
 
+        std::cout << std::fixed << std::setprecision(7);
+        //cout << "kalman" << current_lat <<" "<<current_lon <<endl;
         Node* current_node = find_current_node(global_path_, current_lat, current_lon);
         Node *next_node;
+        Node *current2_node = find_next_node(global_path_, current_node,1);
         int threshold = 70;
         std::string id_str = std::to_string(current_node->id);//아이디를 string으로
         std::string truncated_id_str = id_str.substr(1);//첫번째 숫자를 제외
         int current_node_num = std::stoi(truncated_id_str);//현재 몇번째 점인지
         if(current_node_num>=threshold){
-            next_node = find_next_node(global_path_, current_node, 12);
+            next_node = find_next_node(global_path_, current_node, 13);
         }
         else{
             next_node = find_next_node(global_path_, current_node, 7);
@@ -272,17 +275,15 @@ public:
             return;
         }
 
-
         // 현재 노드 퍼블리슁
         std_msgs::Float32MultiArray current_node_msg;
         current_node_msg.data.resize(2);
         current_node_msg.data[0] = current_node->x;
         current_node_msg.data[1] = current_node->y;
         pub_current_node_.publish(current_node_msg);
-        cout << "current_node id:" << to_string(current_node->id)<<endl;
-        cout << "current_node coord : " << to_string(current_node->x) << " " << to_string(current_node->y) << endl;
+        // cout << "current_node id:" << to_string(current_node->id)<<endl;
+        // cout << "current_node coord : " << to_string(current_node->x) << " " << to_string(current_node->y) << endl;
 
-        //다음 노드 퍼블리쉬
         std_msgs::Float32MultiArray next_node_msg;
         next_node_msg.data.resize(2);
         next_node_msg.data[0] = next_node->x;
@@ -291,8 +292,13 @@ public:
         cout << "next_node id:" << to_string(next_node->id)<<endl;
         cout << "next_node coord : " << to_string(next_node->x) << " " << to_string(next_node->y) << endl;
 
-        
-        
+        std_msgs::Float32MultiArray current2_node_msg;
+        current2_node_msg.data.resize(2);
+        current2_node_msg.data[0] = current2_node->x;
+        current2_node_msg.data[1] = current2_node->y;
+        pub_next_by_node_.publish(current2_node_msg);
+        //cout << "next_node id:" << to_string(next_node->id)<<endl;
+        //cout << "next_node coord : " << to_string(next_node->x) << " " << to_string(next_node->y) << endl;
         
         //여기부터 플로팅
         lanelet::projection::UtmProjector projection(lanelet::Origin({37.5418003, 127.07848369999999}));
@@ -360,14 +366,12 @@ public:
         std::string truncated_id_str = id_str.substr(1);//첫번째 숫자를 제외
         int current_node_num = std::stoi(truncated_id_str);//현재 몇번째 점인지
 
-        if(msg->objectinfo.size() ==0){
-            cout <<"0 임 "<<endl;
-        
-            printf("%d",p);
-            return ;
-        }
+        if(msg->objectinfo.size() ==0){//빈 리스트일때, 그냥 무시
+           return;
+       }
 
-        else if(current_node_num <= threshold){//우회전하기 전일 때!, 정적 장애물을 피해 경로 재계산, 장애물들 중에 가장 가까운 장애물만 먼저 회피하고 다른 장애물은 가까워지면 그때 회피하자
+        else if(current_node_num <= threshold){//우회전하기 전일 때!, 정적 장애물을 피해 경로 재계산, 장애물들 중에 가장 가까운 장애물만 먼저 회피하고 다른 장애물은 가까워지면 그때 회피하자, 하지만 이 코드는 v2이므로 걍 주석 처리한다
+            /*
             double min = numeric_limits<double>::max();
             double closest_lat = -1;
             double closest_lon = -1;
@@ -377,7 +381,7 @@ public:
                 double obs_lat = obj.latitude;
                 double obs_lon = obj.longitude;
                 double obs_size = obj.size;
-                distance_to_person = haversine(current_lat,current_lon,obs_lat,obs_lon);
+                distance_to_person = getDistance_to_obj(current_lat,current_lon,obs_lat,obs_lon);
                 if(distance_to_person < min){
                     min = distance_to_person;
                     closest_lat = obs_lat;
@@ -389,14 +393,17 @@ public:
             global_path_ = Astar(current_node,&target_node,closest_lat,closest_lon,closest_size);//결과적으로 가장 가까운 장애물을 회피하여 경로 재생성
             printf("%d",p);
             p++;
-            cout << "정적 장애물 발견하여 경로 재계산" << endl;
-            cout << "장애물 회피 시작시 장애물과의 거리 " << distance_to_person << " units" << endl;
+            */
+            cout << "정적 장애물 발견하여 경로 재계산" << endl;//그냥 놔두긴 함
+           //cout << "장애물 회피 시작시 장애물과의 거리 " << distance_to_person << " units" << endl;
         }
         else{//우회전을 하고 나서 동적 장애물이 나타났을때!! 멈춤, 경로 재계산 안함, 장애물 사라지면 루프문에 있는 퍼블리셔로 다시 출발하게 됨
-
+       
         std_msgs::Bool stop_sign;
         stop_sign.data = true;
         pub_stop.publish(stop_sign);
+        
+        //cout << "MIN :: "<< min<< endl;
         }
         
         }
@@ -419,6 +426,29 @@ public:
             }
         }
         */
+    
+void draw_graph(vector<Node>& nodes) {
+    for (auto& node : nodes) {
+        std::string id_str = std::to_string(node.id);
+        if (id_str.size() > 1) {
+            std::string truncated_id_str = id_str.substr(1);
+            int truncated_id = std::stoi(truncated_id_str);
+            int target_id = truncated_id + 1;
+
+            for (auto& other_node : nodes) {
+                std::string other_id_str = std::to_string(other_node.id);
+                if (other_id_str.size() > 1) {
+                    int other_truncated_id = std::stoi(other_id_str.substr(1));
+                    if (other_truncated_id == target_id) {
+                        node.neighbors.push_back(&other_node);
+                    }
+                }
+            }
+        } else {
+            //std::cout << "Node ID: " << id_str << " (no first digit to remove)" << std::endl;
+        }
+    }
+}
     vector<Node*> Astar(Node* start, Node* end,double obs_lat = -1, double obs_lon = -1, double obs_size = 0) {
     if (start == nullptr || end == nullptr) {
         cerr << "Error: Start or end node is null" << endl;
@@ -482,7 +512,52 @@ public:
     return global_path_;
 }
 
+vector<Node*> const_path(){
+    
+    std::vector<Node*> const_path_; // 결과 경로를 저장하는 벡터
 
+    // 각 조건에 따라 노드를 const_path_에 추가
+    for (int i = 1; i <= 140; i++) {
+        int node_id;
+        if (i <= 19) {
+            node_id = 30000 + i;
+        }
+        else if(i == 20){
+            node_id = 10000 + i;
+        }
+        else if(i == 21){
+            node_id = 20000 + i;
+        }
+         else if (i <= 28) {
+            node_id = 40000 + i;
+        } 
+        else if( i <= 95){
+            node_id = 20000 + i;
+        }
+        else {
+            node_id = 10000 + i;
+        }
+
+        // nodes_에서 해당 ID를 가진 노드 찾기
+        auto it = std::find_if(nodes_.begin(), nodes_.end(), [node_id](const Node& node) {
+            return node.id == node_id;
+        });
+
+        // 노드가 발견되면 const_path_에 추가
+        if (it != nodes_.end()) {
+            const_path_.push_back(&(*it));
+        } else {
+           // std::cout << "Node with ID " << node_id << " not found." << std::endl;
+        }
+    }
+
+    // 결과 출력
+    for (Node* node : const_path_) {
+        //std::cout << "Node id: " << node->id << std::endl;
+    }
+
+    return const_path_;
+    }
     void boundingBoxCallback(const detection_msgs::BoundingBoxes::ConstPtr& msg) {//이건 안쓸거임!!! 장애물 타입 상관 없이 구간에 따라 바꿀것!!
         /*
         person_detected_temp = false;
@@ -521,6 +596,7 @@ private:
     ros::Subscriber sub_obj_info_;
     //ros::Subscriber sub_bboxes_;안씀
     ros::Publisher pub_current_node_;  
+    ros::Publisher pub_next_by_node_;
     ros::Publisher pub_;
     ros::Publisher pub_stop;
     vector<Node> nodes_;
@@ -539,7 +615,7 @@ private:
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "path_planner_node");
-    
+    //const_path();
     PathPlanner path_planner;
 
     ros::Rate loop_rate(4); // 0.25초마다 실행

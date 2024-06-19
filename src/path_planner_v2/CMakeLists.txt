@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(main_control)
+project(path_planner_v2)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -8,18 +8,24 @@ project(main_control)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  geometry_msgs
   roscpp
   rospy
+  sensor_msgs
+  visualization_msgs
   std_msgs
+  geometry_msgs
   message_generation
-  lanelet2_projection
-  lanelet2_core
+  message_runtime
+  gps_imu_ekf
+  # euclidean_clustering
+  detection_msgs
+  sensor_msgs
+  nav_msgs
+  pcl_conversions
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -51,11 +57,9 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-   FILES
-   Gnss.msg
-   
-)
+# add_message_files(
+#   FILES
+# )
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -73,9 +77,8 @@ add_message_files(
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
-   DEPENDENCIES
-   geometry_msgs
-   std_msgs
+  DEPENDENCIES
+  sensor_msgs visualization_msgs geometry_msgs std_msgs
 )
 
 ################################################
@@ -109,8 +112,8 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES main_control
-  CATKIN_DEPENDS geometry_msgs roscpp std_msgs message_runtime
+#  LIBRARIES euclidean_clustering
+ CATKIN_DEPENDS roscpp rospy sensor_msgs visualization_msgs message_runtime
 #  DEPENDS system_lib
 )
 
@@ -123,11 +126,20 @@ catkin_package(
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
+  ${gps_imu_ekf_INCLUDE_DIRS}
+  # ${euclidean_clustering_INCLUDE_DIRS}
+
+)
+
+add_executable(path_planner_node_v2 src/path_planner_node_v2.cpp)
+add_dependencies(path_planner_node_v2 ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(path_planner_node_v2
+  ${catkin_LIBRARIES}
 )
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/main_control.cpp
+#   src/${PROJECT_NAME}/euclidean_clustering.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -138,7 +150,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(control src/control.cpp)
+# add_executable(${PROJECT_NAME}_node src/euclidean_clustering_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -151,10 +163,9 @@ add_executable(control src/control.cpp)
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(control
-   ${catkin_LIBRARIES}
-   
-   )
+# target_link_libraries(${PROJECT_NAME}_node
+#   ${catkin_LIBRARIES}
+# )
 
 #############
 ## Install ##
@@ -203,10 +214,11 @@ target_link_libraries(control
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_main_control.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_euclidean_clustering.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+

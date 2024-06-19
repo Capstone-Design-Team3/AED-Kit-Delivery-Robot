@@ -280,9 +280,9 @@ void EuclideanClustering::ObjectVisualization(double object_lat, double object_l
     object_marker.pose.orientation.y = 0.0;
     object_marker.pose.orientation.z = 0.0;
     object_marker.pose.orientation.w = 1.0;
-    object_marker.scale.x = 1.0;
-    object_marker.scale.y = 1.0;
-    object_marker.scale.z = 1.0;
+    object_marker.scale.x = size;
+    object_marker.scale.y = size;
+    object_marker.scale.z = size;
     object_marker.color.a = 1.0;
     object_marker.color.r = 1.0;
     // object_marker.color.g = 1.0;
